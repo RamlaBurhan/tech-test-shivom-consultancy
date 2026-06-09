@@ -72,7 +72,8 @@
   retries: 40
   delay: 20
   until: >
-    es_health.status == 200 and es_health.json.status in ['green', 'yellow']
+    es_health.status == 200 and
+    es_health.json.status in ['green', 'yellow']
 
 - name: Wait for Kibana to be healthy
   ansible.builtin.uri:
@@ -82,3 +83,4 @@
   retries: 20
   delay: 10
   until: kibana_health.status == 200
+  
