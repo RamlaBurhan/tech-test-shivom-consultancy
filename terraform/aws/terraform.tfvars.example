@@ -1,0 +1,8 @@
+region         = "eu-west-2"
+name            = "sample-web-app"
+environment     = "dev"
+instance_type   = "t3.medium"
+instance_count  = 1
+key_name        = ""
+allowed_ssh_cidr = "0.0.0.0/0"
+enable_alb      = true
