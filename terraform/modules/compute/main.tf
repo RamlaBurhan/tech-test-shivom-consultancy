@@ -48,10 +48,10 @@ resource "aws_instance" "app" {
   key_name                    = var.key_name != "" ? var.key_name : null
   user_data                   = var.user_data != "" ? var.user_data : null
 
-  # root_block_device {
-  #   volume_size = 40
-  #   volume_type = "gp3" #change to gp2 for local stack
-  # }
+  root_block_device {
+    volume_size = 40
+    volume_type = "gp3" #change to gp2 for local stack
+  }
 
   tags = merge(var.tags, { Name = "${var.name}-app-${count.index}" })
 }
