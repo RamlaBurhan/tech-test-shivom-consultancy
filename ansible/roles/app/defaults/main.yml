@@ -1,0 +1,10 @@
+---
+app_name: sample-web-app
+app_port: 3000
+app_version: "1.0.0"
+app_dir: /opt/sample-web-app
+# Build from synced source by default (local VM path). CD overrides this to false to pull the published image.
+app_build_locally: true
+app_image: "ghcr.io/owner/sample-web-app:latest"
+node_exporter_enabled: true
+node_exporter_version: "1.8.2"

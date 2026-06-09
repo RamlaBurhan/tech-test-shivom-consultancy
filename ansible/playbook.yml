@@ -1,0 +1,10 @@
+---
+- name: Configure application hosts
+  hosts: app
+  become: true
+  roles:
+    - common
+    - docker
+    - app
+    - monitoring
+    - logging

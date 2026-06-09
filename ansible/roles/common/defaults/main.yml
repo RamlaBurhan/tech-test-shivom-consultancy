@@ -1,0 +1,9 @@
+---
+app_dir: /opt/sample-web-app
+app_log_dir: /var/log/sample-web-app
+base_packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - python3
+  - rsync

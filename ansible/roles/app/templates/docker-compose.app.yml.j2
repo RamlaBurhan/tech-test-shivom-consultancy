@@ -1,0 +1,36 @@
+#jinja2: trim_blocks:True, lstrip_blocks:True
+name: {{ app_name }}
+
+services:
+  app:
+{% if app_build_locally | bool %}
+    build: ./app
+    image: {{ app_name }}:{{ app_version }}
+{% else %}
+    image: {{ app_image }}
+{% endif %}
+    environment:
+      NODE_ENV: production
+      SERVICE_NAME: {{ app_name }}
+      APP_VERSION: "{{ app_version }}"
+    ports:
+      - "{{ app_port }}:{{ app_port }}"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+{% if node_exporter_enabled | bool %}
+
+  node-exporter:
+    image: prom/node-exporter:v{{ node_exporter_version }}
+    command:
+      - --path.rootfs=/host
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    ports:
+      - "9100:9100"
+    restart: unless-stopped
+{% endif %}

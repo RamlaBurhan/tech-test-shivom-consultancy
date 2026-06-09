@@ -1,0 +1,121 @@
+---
+- name: Create monitoring directory
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create prometheus config subdirectory
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}/prometheus"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create alertmanager config subdirectory
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}/alertmanager"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create grafana provisioning subdirectories
+  ansible.builtin.file:
+    path: "{{ monitoring_dir }}/grafana/provisioning/{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - datasources
+    - dashboards
+
+- name: Render prometheus.yml
+  ansible.builtin.template:
+    src: prometheus.yml.j2
+    dest: "{{ monitoring_dir }}/prometheus/prometheus.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart monitoring stack
+
+- name: Render alerts.yml
+  ansible.builtin.template:
+    src: alerts.yml.j2
+    dest: "{{ monitoring_dir }}/prometheus/alerts.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart monitoring stack
+
+- name: Render alertmanager.yml
+  ansible.builtin.template:
+    src: alertmanager.yml.j2
+    dest: "{{ monitoring_dir }}/alertmanager/alertmanager.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart monitoring stack
+
+- name: Render Grafana datasource provisioning
+  ansible.builtin.template:
+    src: grafana-datasource.yml.j2
+    dest: "{{ monitoring_dir }}/grafana/provisioning/datasources/prometheus.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart monitoring stack
+
+- name: Render monitoring docker-compose file
+  ansible.builtin.template:
+    src: docker-compose.monitoring.yml.j2
+    dest: "{{ monitoring_dir }}/docker-compose.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy monitoring stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ monitoring_dir }}"
+    state: present
+    pull: missing
+
+- name: Render Grafana dashboard provider config
+  ansible.builtin.template:
+    src: grafana-dashboard.yml.j2
+    dest: "{{ monitoring_dir }}/grafana/provisioning/dashboards/dashboard.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart monitoring stack
+
+- name: Render app overview dashboard
+  ansible.builtin.template:
+    src: app-overview.json.j2
+    dest: "{{ monitoring_dir }}/grafana/provisioning/dashboards/app-overview.json"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart monitoring stack
+
+- name: Wait for Prometheus to be healthy
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ prometheus_port }}/-/healthy"
+    status_code: 200
+  register: prom_health
+  retries: 10
+  delay: 5
+  until: prom_health.status == 200
+
+- name: Wait for Grafana to be healthy
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ grafana_port }}/api/health"
+    status_code: 200
+  register: grafana_health
+  retries: 10
+  delay: 5
+  until: grafana_health.status == 200

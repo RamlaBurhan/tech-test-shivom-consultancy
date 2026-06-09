@@ -1,0 +1,33 @@
+---
+monitoring_dir: /opt/monitoring
+
+# Versions
+prometheus_version: "2.55.1"
+alertmanager_version: "0.27.0"
+grafana_version: "11.3.1"
+
+# Prometheus
+prometheus_port: 9090
+prometheus_scrape_interval: 15s
+prometheus_evaluation_interval: 15s
+
+# Alertmanager
+alertmanager_port: 9093
+alertmanager_slack_webhook: ""   # Override via github action secrets in cd
+
+# Grafana
+grafana_port: 3001
+grafana_admin_user: admin
+grafana_admin_password: admin        # this is for local testing only — override via github action secrets in cd
+grafana_allow_signup: "false"
+
+# Targets
+prometheus_app_target: "172.17.0.1:3000"   # host gateway from container
+prometheus_node_exporter_target: "172.17.0.1:9100"
+prometheus_app_job_name: sample-web-app
+
+# Alert thresholds
+alert_cpu_threshold: 80
+alert_memory_threshold: 85
+alert_error_rate_threshold: 0.05
+alert_latency_threshold: 1

@@ -1,0 +1,12 @@
+{# jinja2: trim_blocks:True, lstrip_blocks:True #}
+# Rendered by Ansible — do not edit by hand.
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    # 'prometheus' resolves via Docker Compose internal DNS
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    

@@ -1,0 +1,19 @@
+---
+plugin: amazon.aws.aws_ec2
+regions:
+  - eu-west-2
+filters:
+  tag:Project: sample-web-app
+  instance-state-name: running
+keyed_groups:
+  - key: tags.Environment
+    prefix: env
+groups:
+  app: tags.get('Project') == 'sample-web-app'
+  monitoring: tags.get('Project') == 'sample-web-app'
+  logging: tags.get('Project') == 'sample-web-app'
+hostnames:
+  - ip-address
+compose:
+  ansible_host: public_ip_address
+  ansible_user: "'ubuntu'"

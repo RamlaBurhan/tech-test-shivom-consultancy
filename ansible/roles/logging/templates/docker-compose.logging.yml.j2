@@ -1,0 +1,54 @@
+{# jinja2: trim_blocks:True, lstrip_blocks:True #}
+name: logging
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:{{ elasticsearch_version }}
+    environment:
+      - discovery.type=single-node
+      - cluster.name={{ elasticsearch_cluster_name }}
+      - ES_JAVA_OPTS=-Xms{{ elasticsearch_heap_size }} -Xmx{{ elasticsearch_heap_size }}
+      # Disable security for this exercise — enable x-pack in production
+      - xpack.security.enabled=false
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - "{{ elasticsearch_port }}:9200"
+    restart: unless-stopped
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+  logstash:
+    image: docker.elastic.co/logstash/logstash:{{ logstash_version }}
+    environment:
+      - LS_JAVA_OPTS=-Xms{{ logstash_heap_size }} -Xmx{{ logstash_heap_size }}
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+    ports:
+      - "{{ logstash_beats_port }}:5044"
+    restart: unless-stopped
+    depends_on:
+      - elasticsearch
+  kibana:
+    image: docker.elastic.co/kibana/kibana:{{ kibana_version }}
+    environment:
+      ELASTICSEARCH_HOSTS: "{{ kibana_elasticsearch_url }}"
+    ports:
+      - "{{ kibana_port }}:5601"
+    restart: unless-stopped
+    depends_on:
+      - elasticsearch
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:{{ elasticsearch_version }}
+    user: root
+    command: ["filebeat", "-e", "-strict.perms=false"]
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - logstash
+    restart: unless-stopped
+
+volumes:
+  elasticsearch-data:

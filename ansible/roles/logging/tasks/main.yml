@@ -1,0 +1,86 @@
+---
+- name: Create logging directory
+  ansible.builtin.file:
+    path: "{{ logging_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create logstash pipeline config subdirectory
+  ansible.builtin.file:
+    path: "{{ logging_dir }}/logstash/pipeline"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create filebeat config subdirectory
+  ansible.builtin.file:
+    path: "{{ logging_dir }}/filebeat"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Set vm.max_map_count for Elasticsearch
+  ansible.posix.sysctl:
+    name: vm.max_map_count
+    value: "262144"
+    sysctl_set: true
+    state: present
+    reload: true
+
+- name: Render Logstash pipeline config
+  ansible.builtin.template:
+    src: logstash-pipeline.conf.j2
+    dest: "{{ logging_dir }}/logstash/pipeline/app.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart logging stack
+
+- name: Render Filebeat config
+  ansible.builtin.template:
+    src: filebeat.yml.j2
+    dest: "{{ logging_dir }}/filebeat/filebeat.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart logging stack
+
+- name: Render logging docker-compose file
+  ansible.builtin.template:
+    src: docker-compose.logging.yml.j2
+    dest: "{{ logging_dir }}/docker-compose.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy logging stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ logging_dir }}"
+    state: present
+    pull: missing
+
+# Elasticsearch takes 30–60s to initialise — poll until the cluster is green/yellow.
+- name: Wait for Elasticsearch to be healthy
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ elasticsearch_port }}/_cluster/health"
+    status_code: 200
+  register: es_health
+  retries: 40
+  delay: 20
+  until: >
+    es_health.status == 200 and
+    es_health.json.status in ['green', 'yellow']
+
+- name: Wait for Kibana to be healthy
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ kibana_port }}/api/status"
+    status_code: 200
+  register: kibana_health
+  retries: 20
+  delay: 10
+  until: kibana_health.status == 200
+  

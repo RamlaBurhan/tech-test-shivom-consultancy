@@ -1,0 +1,35 @@
+---
+- name: Sync application source to host
+  ansible.posix.synchronize:
+    src: "{{ playbook_dir }}/../app/"
+    dest: "{{ app_dir }}/app/"
+    delete: true
+    rsync_opts:
+      - "--exclude=node_modules"
+      - "--exclude=coverage"
+      - "--exclude=.git"
+  when: app_build_locally | bool
+
+- name: Render application compose file
+  ansible.builtin.template:
+    src: docker-compose.app.yml.j2
+    dest: "{{ app_dir }}/docker-compose.yml"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Deploy application stack
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_dir }}"
+    state: present
+    build: "{{ 'always' if app_build_locally | bool else 'never' }}"
+    pull: "{{ 'missing' if app_build_locally | bool else 'always' }}"
+
+- name: Wait for the application health endpoint
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ app_port }}/healthz"
+    status_code: 200
+  register: health
+  retries: 10
+  delay: 3
+  until: health.status == 200

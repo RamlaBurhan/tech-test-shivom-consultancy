@@ -1,0 +1,36 @@
+# Input: Beats (Filebeat on the app VM ships logs here)
+input {
+  beats {
+    port => {{ logstash_input_port }}
+  }
+}
+
+# Filter: parse JSON logs from the Node app (json-file Docker logging driver)
+filter {
+  if [message] =~ /^\{/ {
+    json {
+      source => "message"
+      target => "parsed"
+    }
+    mutate {
+      add_field => {
+        "level"      => "%{[parsed][level]}"
+        "service"    => "%{[parsed][service]}"
+        "request_id" => "%{[parsed][requestId]}"
+      }
+    }
+  }
+
+  # Drop noisy healthcheck logs
+  if [parsed][path] == "/healthz" {
+    drop {}
+  }
+}
+
+# Output: index into Elasticsearch with a daily rolling index
+output {
+  elasticsearch {
+    hosts => ["elasticsearch:{{ elasticsearch_port }}"]
+    index => "{{ logstash_index_prefix }}-%{+YYYY.MM.dd}"
+  }
+}

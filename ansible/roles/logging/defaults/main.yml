@@ -1,0 +1,34 @@
+---
+logging_dir: /opt/logging
+
+# Versions
+elasticsearch_version: "8.13.0"
+logstash_version: "8.13.0"
+kibana_version: "8.13.0"
+
+# Ports
+elasticsearch_port: 9200
+logstash_beats_port: 5044
+kibana_port: 5601
+
+# Elasticsearch
+elasticsearch_cluster_name: ramla-logs
+elasticsearch_heap_size: 256m
+
+# Logstash
+logstash_heap_size: 256m
+
+# Kibana
+kibana_elasticsearch_url: http://elasticsearch:9200
+
+# Logstash input — Filebeat send logs here
+logstash_input_port: "{{ logstash_beats_port }}"
+
+# Index prefix used in Logstash output and Kibana index pattern
+logstash_index_prefix: "app-logs"
+
+# filebeat
+app_image_name: sample-web-app
+app_image_tag: local
+logstash_host: logstash
+filebeat_log_level: info
