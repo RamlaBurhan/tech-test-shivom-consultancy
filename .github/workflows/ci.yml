@@ -77,6 +77,18 @@ jobs:
           tflint --recursive
         working-directory: terraform
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Terraform plan (aws)
+        working-directory: terraform/aws
+        run: |
+          terraform init -input=false
+          terraform plan -input=false
+
   ansible:
     name: ansible lint
     runs-on: ubuntu-latest
