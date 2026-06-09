@@ -1,0 +1,111 @@
+name: cd
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/ramlaburhan/ansible-ec2-platform/sample-web-app
+
+jobs:
+  build-and-push:
+    name: build and push image
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve image tag
+        id: meta
+        run: echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: app
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: provision and deploy
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: vars.DEPLOY_ENABLED == 'true'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.0
+
+      - name: Terraform apply
+        working-directory: terraform/aws
+        run: |
+          terraform init -input=false
+          terraform apply -auto-approve -input=false
+
+      - name: Capture instance inventory
+        id: tf
+        working-directory: terraform/aws
+        run: |
+          echo "ips=$(terraform output -json instance_public_ips | jq -r 'join(",")')" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ansible
+        run: pip install ansible
+
+      - name: Deploy with ansible
+        working-directory: ansible
+        env:
+          IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          ansible-galaxy collection install -r requirements.yml
+          printf '%s' "$SSH_KEY" > deploy_key && chmod 600 deploy_key
+          {
+            echo "[app]"
+            for ip in $(echo "${{ steps.tf.outputs.ips }}" | tr ',' ' '); do
+              echo "${ip} ansible_user=ubuntu"
+            done
+          } > inventory/ci.ini
+          ansible-playbook -i inventory/ci.ini playbook.yml \
+            --private-key deploy_key \
+            -e app_build_locally=false \
+            -e app_image=${{ env.IMAGE }}:${{ needs.build-and-push.outputs.image_tag }} \
+            -e grafana_admin_password=${{ secrets.GRAFANA_PASSWORD }} \
+            -e alertmanager_slack_webhook=${{ secrets.ALERTMANAGER_SLACK_WEBHOOK }}
